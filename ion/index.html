@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ja">
+<head>
+ <meta charset="utf-8">
+ <title>主なイオン</title>
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <style>
+ body{
+ font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+ "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+ line-height: 1.6;
+ }
+ #question{ font-size:1.2rem; font-weight:700; }
+ .toolbar{ display:flex; flex-wrap:wrap; gap:.25rem; margin:.25rem 0 .5rem; }
+ .toolbar button{ padding:.25rem .5rem; }
+ .row{ margin:.4rem 0; }
+ /* 既定どおりの上付き/下付き表示を明示（リセットCSS対策） */
+ sub{ vertical-align:sub; font-size:smaller; }
+ sup{ vertical-align:super; font-size:smaller; }
+ </style>
+</head>
+<body>
+ <h1>主なイオン</h1>
+ <p id="question">「ランダム出題」を押してください</p>
+ <button id="askBtn">ランダム出題</button>
+ <button id="nextBtn" disabled>次の問題へ</button>
+ <form id="answerForm" autocomplete="off" class="row">
+ <input id="answer" type="text" style="min-width:min(90vw,28rem)" placeholder="化学式を入力">
+ <button type="submit">送信</button>
+ </form>
+ <div class="toolbar" id="toolbar-sup">
+ <span style="align-self:center">上付き：</span>
+ </div>
+ <div class="toolbar" id="toolbar-sub">
+ <span style="align-self:center">下付き：</span>
+ </div>
+ <p id="result"></p>
+ <p id="correct"></p>
+ <h2>入力のルール</h2>
+ <ul>
+ <li>イオンの化学式を<u>半角英数字</u>で入力してください。</li>
+ <li>上付き文字、下付き文字はボタンから入力できます。</li>
+ <li>OH-, NH4+, CO3^2-, SO4 2- などは自動で OH<sup>-</sup>, NH<sub>4</sub><sup>+</sup>, CO<sub>3</sub><sup>2-</sup>, SO<sub>4</sub><sup>2-</sup> に変換されます。</li>
+ </ul>
+ <h4>一部環境では上付き文字、下付き文字が正しく表示されない場合があります。</h4>
+ <a href="../">ホームへ</a>
+<script>
+// ===== データ（すべて Unicode 規範形で保持） =====
+const IONS = [
+ {name:'リチウムイオン', formula:'Li⁺'},
+ {name:'ナトリウムイオン', formula:'Na⁺'},
+ {name:'カリウムイオン', formula:'K⁺'},
+ {name:'銀イオン', formula:'Ag⁺'},
+ {name:'銅(I)イオン', formula:'Cu⁺'},
+ {name:'マグネシウムイオン', formula:'Mg²⁺'},
+ {name:'カルシウムイオン', formula:'Ca²⁺'},
+ {name:'バリウムイオン', formula:'Ba²⁺'},
+ {name:'亜鉛イオン', formula:'Zn²⁺'},
+ {name:'鉄(II)イオン', formula:'Fe²⁺'},
+ {name:'銅(II)イオン', formula:'Cu²⁺'},
+ {name:'鉛(II)イオン', formula:'Pb²⁺'},
+ {name:'アルミニウムイオン', formula:'Al³⁺'},
+ {name:'鉄(III)イオン', formula:'Fe³⁺'},
+ {name:'アンモニウムイオン', formula:'NH₄⁺'},
+ {name:'フッ化物イオン', formula:'F⁻'},
+ {name:'塩化物イオン', formula:'Cl⁻'},
+ {name:'臭化物イオン', formula:'Br⁻'},
+ {name:'ヨウ化物イオン', formula:'I⁻'},
+ {name:'酸化物イオン', formula:'O²⁻'},
+ {name:'硫化物イオン', formula:'S²⁻'},
+ {name:'水酸化物イオン', formula:'OH⁻'},
+ {name:'硝酸イオン', formula:'NO₃⁻'},
+ {name:'酢酸イオン', formula:'CH₃COO⁻'},
+ {name:'炭酸水素イオン', formula:'HCO₃⁻'},
+ {name:'炭酸イオン', formula:'CO₃²⁻'},
+ {name:'硫酸イオン', formula:'SO₄²⁻'},
+ {name:'リン酸イオン', formula:'PO₄³⁻'}
+];
+
+// ===== Unicode 上下付き ↔ ASCII 変換テーブル =====
+const SUP = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻'};
+const SUB = {'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉'};
+const SUP_R = Object.fromEntries(Object.entries(SUP).map(([k,v]) => [v,k]));
+const SUB_R = Object.fromEntries(Object.entries(SUB).map(([k,v]) => [v,k]));
+
+// 全角 → 半角など
+function fw2hw(s){
+ return s
+ .replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFF10 + 48))
+ .replace(/[＋]/g, '+')
+ .replace(/[－−–—]/g, '-')
+ .replace(/\u3000/g, ' ');
+}
+
+// 入力 → Unicode 規範形（完全一致用）
+function toUnicodeChem(input){
+ if(!input) return '';
+ let s = fw2hw(String(input));
+ s = s.replace(/_/g, '').replace(/\s+/g,'');
+ // 既に Unicode 上下付きが入っていても OK。いったん ASCII へ戻して統一処理
+ s = s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]/g, ch => SUP_R[ch] ?? ch)
+      .replace(/[₀₁₂₃₄₅₆₇₈₉]/g, ch => SUB_R[ch] ?? ch);
+ s = s.replace(/\^(?=\d)/g, '');
+ s = s.replace(/([+\-])(\d+)$/, (_,sg,n) => n + sg);
+ // === Unicode 規範形へ ===
+ let charge = '';
+ const m = s.match(/((?:\d+[+\-])|(?:[+\-]\d+)|(?:[+\-]))$/);
+ if (m) { charge = m[0]; s = s.slice(0, -charge.length); }
+ s = s.replace(/([A-Za-z\)])(\d+)/g, (_, h, d) => h + d.split('').map(ch => SUB[ch] ?? ch).join(''));
+ if (charge) {
+   if (/^[+\-]\d+$/.test(charge)) charge = charge.slice(1) + charge[0];
+   const digits = charge.replace(/[+\-]/g,'');
+   const sign = charge[charge.length-1];
+   s += digits.split('').map(ch => SUP[ch] ?? ch).join('') + (SUP[sign] ?? sign);
+ }
+ return s;
+}
+
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+let current = null;
+const els = {
+ q: document.getElementById('question'),
+ askBtn: document.getElementById('askBtn'),
+ nextBtn: document.getElementById('nextBtn'),
+ form: document.getElementById('answerForm'),
+ ans: document.getElementById('answer'),
+ result: document.getElementById('result'),
+ correct: document.getElementById('correct'),
+ sup: document.getElementById('toolbar-sup'),
+ sub: document.getElementById('toolbar-sub')
+};
+
+function ask(){
+ current = pick(IONS);
+ els.q.textContent = `「${current.name}」の化学式`;
+ els.result.textContent = '';
+ els.correct.textContent = '';
+ els.ans.value = '';
+ els.ans.focus();
+ els.nextBtn.disabled = true;
+}
+
+function judge(){
+ if(!current) return;
+ const userU = toUnicodeChem(els.ans.value);
+ const expectedU = current.formula; // ★ 正答表示は保存してある Unicode を“そのまま”
+ if(userU && userU === expectedU){
+   els.result.textContent = '正解！';
+ } else {
+   els.result.textContent = '不正解…';
+   els.correct.textContent = '正答：' + expectedU; // ★ そのまま表示
+ }
+ els.nextBtn.disabled = false;
+}
+
+// ===== ツールバー =====
+function insertAtCursor(txt){
+ const input = els.ans;
+ input.focus();
+ const start = input.selectionStart ?? input.value.length;
+ const end = input.selectionEnd ?? input.value.length;
+ const before = input.value.slice(0,start);
+ const after = input.value.slice(end);
+ input.value = before + txt + after;
+ const pos = start + txt.length;
+ input.setSelectionRange(pos,pos);
+}
+function buildToolbar(){
+ const SUP_MAP = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻'};
+ const SUB_MAP = {'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉'};
+ const supKeys = ['0','1','2','3','4','5','6','7','8','9','+','-'];
+ for(const k of supKeys){
+   const b = document.createElement('button');
+   b.type = 'button';
+   b.textContent = k;
+   b.title = `上付き ${k}`;
+   b.onclick = () => insertAtCursor(SUP_MAP[k]);
+   els.sup.appendChild(b);
+ }
+ const subKeys = ['0','1','2','3','4','5','6','7','8','9'];
+ for(const k of subKeys){
+   const b = document.createElement('button');
+   b.type = 'button';
+   b.textContent = k;
+   b.title = `下付き ${k}`;
+   b.onclick = () => insertAtCursor(SUB_MAP[k]);
+   els.sub.appendChild(b);
+ }
+}
+els.askBtn.addEventListener('click', ask);
+els.nextBtn.addEventListener('click', ask);
+els.form.addEventListener('submit', (e)=>{ e.preventDefault(); judge(); });
+// Enter で次へ（元の仕様のまま）
+document.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !els.nextBtn.disabled){ e.preventDefault(); ask(); }});
+buildToolbar();
+</script>
+</body>
+</html>
