@@ -58,6 +58,12 @@
     <button type="submit">送信</button>
   </form>
 
+  <!-- ▼ ゐ・ゑボタン -->
+  <div style="margin-top:6px;">
+  <button type="button" onclick="insertChar('ゐ')">ゐ</button>
+  <button type="button" onclick="insertChar('ゑ')">ゑ</button>
+  </div>
+
   <!-- ▼ 判定表示 -->
   <p id="result"></p>
   <p id="correct"></p>
@@ -311,6 +317,16 @@
   function getSegments(n){
     const raw = ANSWERS[n];
     return raw ? raw.split(/\s+/) : null;
+  }
+
+  // ゐ・ゑボタン用関数
+  function insertChar(ch){
+  const el = els.answer;
+  const start = el.selectionStart;
+  const end   = el.selectionEnd;
+  el.value = el.value.slice(0, start) + ch + el.value.slice(end);
+  el.selectionStart = el.selectionEnd = start + ch.length;
+  el.focus();
   }
 
   // 範囲内ランダム番号
