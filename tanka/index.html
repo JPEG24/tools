@@ -357,18 +357,8 @@
     els.hint.textContent = '';
 
     if(mode === 'full'){
-      const segs = getSegments(n);
-    
-      if(segs && segs.length === 5){
-        const first = segs[0]; // 初句
-    
-        // 「初句～」を問題として表示
-        els.question.textContent = `${first}～`;
-    
-        // ヒント欄は空でもOK（または補助表示に使ってもよい）
-        els.hint.textContent = '';
-      } else {
-        els.question.textContent = `第${n}首`;
+      els.question.textContent = `第${n}首`;
+      els.answer.placeholder = '和歌の全文を入力';
     } else if(mode === 'part'){
       const segs = getSegments(n);
       if(!segs || segs.length !== 5){ els.question.textContent = `第${n}首（データ未登録）`; return; }
