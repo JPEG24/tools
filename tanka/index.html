@@ -5,7 +5,7 @@
   <title>百人一首</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "游ゴシック体", "Yu Gothic", Meiryo, sans-serif; line-height: 1.6; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "游ゴシック体", "Yu Gothic", Meiryo, sans-serif; line-height: 1.6; margin-left: 30px;}
     fieldset { border: 1px solid #bbb; border-radius: 6px; padding: .5rem .75rem; }
     legend { font-weight: 600; }
     #question { font-size: 1.2rem; font-weight: 700; }
@@ -29,6 +29,10 @@
   <fieldset id="modeBox" style="margin: 8px 0;">
     <legend>出題モード</legend>
     <label><input type="radio" name="mode" value="full" checked> 全文</label>
+    <label style="margin-left:1em;">
+      <input type="radio" name="mode" value="continue">
+      初句から続き
+    </label>
     <label style="margin-left:1em;"><input type="radio" name="mode" value="part"> 一部</label>
     <label style="margin-left:1em;"><input type="radio" name="mode" value="author"> 作者名</label>
     <span id="partPicker" style="margin-left: 8px; display:none;">
@@ -70,8 +74,10 @@
 
   <h2>入力のルール</h2>
   <ul>
-    <li><strong>全文・一部</strong>：<u>ひらがな・歴史的仮名遣い</u>で入力。区切りにはスペース（全角/半角どちらでも）を使用。<strong>完全一致で判定します。</strong></li>
-    <li><strong>一部</strong>：初句の出題時は一文字目がヒントとして表示されますが、一文字目も含めて初句を<u>すべて答えてください。</u></li>
+    <li><strong>作者名以外共通</strong>：<u>ひらがな・歴史的仮名遣い</u>で入力。<strong>完全一致で判定します。</strong></li>
+    <li><strong>全文</strong>：区切りにはスペース（全角/半角どちらでも）を使用。</li>
+    <li><strong>初句から続き</strong>：区切りにはスペース（全角/半角どちらでも）を使用。初句は入力せず、<u>続きのみ</u>を答えてください。</li>
+    <li><strong>一部</strong>：初句の出題時は一文字目がヒントとして表示されますが、一文字目も含めて初句を<u>すべて</u>答えてください。</li>
     <li><strong>作者名</strong>：<u>漢字</u>で入力。よくある表記ゆれ（例：菅家↔菅原道真）はどちらでも正解にしています。</li>
     <li>和歌、作者名の表記は『簡明 小倉百人一首』に準拠。</li>
   </ul>
@@ -359,6 +365,17 @@
     if(mode === 'full'){
       els.question.textContent = `第${n}首`;
       els.answer.placeholder = '和歌の全文を入力';
+    } else if(mode === 'continue'){
+      const segs = getSegments(n);
+
+      els.question.textContent =
+        `第${n}首`;
+
+      // 初句だけ表示
+      els.hint.textContent = segs[0];
+
+      els.answer.placeholder =
+        '初句の続きを入力';
     } else if(mode === 'part'){
       const segs = getSegments(n);
       if(!segs || segs.length !== 5){ els.question.textContent = `第${n}首（データ未登録）`; return; }
@@ -400,6 +417,31 @@
       const expected = normalizeForExactHistorical(ANSWERS[currentNumber]);
       if(user && user === expected){ els.result.textContent = '正解！'; els.result.className='ok'; }
       else { els.result.textContent = '不正解…'; els.result.className='ng'; els.correct.textContent = `正答：${ANSWERS[currentNumber]}`; }
+    } else if(mode === 'continue') {
+      const segs = getSegments(currentNumber);
+
+      // 第2句～第5句を連結
+      const expected =
+        normalizeForExactHistorical(
+          segs.slice(1).join(' ')
+        );
+
+      const user =
+        normalizeForExactHistorical(
+          els.answer.value
+        );
+
+      if(user && user === expected){
+        els.result.textContent = '正解！';
+        els.result.className = 'ok';
+      }
+      else{
+        els.result.textContent = '不正解…';
+        els.result.className = 'ng';
+
+        els.correct.textContent =
+          `正答：${segs.slice(1).join(' ')}`;
+      }
     }
     else if(mode === 'part'){
       const segs = getSegments(currentNumber);
@@ -436,6 +478,7 @@
     els.partPicker.style.display = (m === 'part') ? 'inline-block' : 'none';
     // プレースホルダ更新
     if(m === 'full')      els.answer.placeholder = '和歌の全文を入力';
+    else if(m === 'continue') els.answer.placeholder = '初句の続きを入力';
     else if(m === 'part') els.answer.placeholder = '空欄に入る句を入力';
     else if(m === 'author') els.answer.placeholder = '作者名を漢字で入力';
   });
