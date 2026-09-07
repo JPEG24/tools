@@ -17,6 +17,16 @@
 				display: flex;
 				gap: 10px;
 			}
+      #questionSetting {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+			#partSelect {
+				display: none;
+				/* display: flex; */
+				gap: 7.5px;
+			}
 			#statement {
 				font-size: 1.5em;
 				margin: 20px 0;
@@ -25,15 +35,15 @@
 				display: flex;
 				gap: 20px;
 				margin: 10px 0;
-				#utility {
-					display: flex;
-					gap: 10px;
-					font-weight: bold;
-				}
-				#support {
-					display: flex;
-					gap: 10px;
-				}
+			}
+			#utility {
+				display: flex;
+				gap: 10px;
+				font-weight: bold;
+			}
+			#support {
+				display: flex;
+				gap: 10px;
 			}
 			#answer {
 				width: 40em;
@@ -48,42 +58,284 @@
 				<legend><b>モード選択</b></legend>
 				<div class="radio">
 					<label><input type="radio" name="mode" value="all">全文</label>
-					<label><input type="radio" name="mode" value="part">初句から全文</label>
-					<label><input type="radio" name="mode" value="first">一部</label>
+					<label><input type="radio" name="mode" value="first">初句から全文</label>
+					<label><input type="radio" name="mode" value="part">一部</label>
 					<label><input type="radio" name="mode" value="author">作者名</label>
 				</div>
 			</fieldset>
-			出題範囲を指定：
-			<label><input id="range-from" type="number" name="range" min="1" max="100" value="1"></label>
-			～
-			<label><input id="range-to" type="number" name="range" min="1" max="100" value="100"></label>
+      <div id="questionSetting">
+        <div id="rangeSelect">
+          範囲を指定：
+          <label><input id="rangeFrom" type="number" name="range" min="1" max="100" value="1"></label>
+          ～
+          <label><input id="rangeTo" type="number" name="range" min="1" max="100" value="100"></label>
+        </div>
+        <div id="partSelect">
+          句を指定：
+          <input value="1" type="checkbox" checked>初句
+          <input value="2" type="checkbox" checked>二句
+          <input value="3" type="checkbox" checked>三句
+          <input value="4" type="checkbox" checked>四句
+          <input value="5" type="checkbox" checked>結句
+        </div>
+      </div>
 		</div>
 
+		<p id="info"></p>
 		<p id="statement">モードを選択してください</p>
 
 		<div id="buttons">
 			<div id="utility">
 				<button id="submit"><strong>解答</strong></button>
-				<button id="question"><strong>出題</strong></button>
+				<button id="next"><strong>出題</strong></button>
 			</div>
 			<div id="support">
-				<button id="wi" onclick="insertText('ゐ')">ゐ</button>
-				<button id="we" onclick="insertText('ゑ')">ゑ</button>
+				<button id="wi">ゐ</button>
+				<button id="we">ゑ</button>
 			</div>
 		</div>
 
 		<input type="text" id="answer">
 
+		<p id="result"></p>
+		<p id="correctAnswer"></p>
+
     <h2>入力のルール</h2>
     <ul>
-      <!--TODO-->
+      <li><strong>全文</strong>：全文を歴史的仮名遣いで入力</li>
+			<li><strong>初句から全文</strong>：二句目以降を歴史的仮名遣いで入力</li>
+			<li><strong>一部</strong>：指定された句を歴史的仮名遣いで入力</li>
+			<li><strong>作者名</strong>：漢字で入力（多少の表記揺れは許容される）</li>
     </ul>
     <a href="../index.html">ホームへ戻る</a>
 	</body>
 </html>
-<script>
-  import { TANKA, TANKA_KANJI, AUTHORS } from "../lib/tanka.js";
+<script type="module">
+  import { TANKA_KANA, TANKA_KANJI, AUTHORS } from "../lib/tanka.js";
+
+  const els = {
+    // 必要になったら書き足す
+		mode: document.getElementById('mode'),
+		rangeFrom: document.getElementById('rangeFrom'),
+		rangeTo: document.getElementById('rangeTo'),
+		partSelect: document.getElementById('partSelect'),
+		info: document.getElementById('info'),
+		statement: document.getElementById('statement'),
+		next: document.getElementById('next'),
+		submit: document.getElementById('submit'),
+		wi: document.getElementById('wi'),
+		we: document.getElementById('we'),
+    answer: document.getElementById('answer'),
+    result: document.getElementById('result'),
+    correctAnswer: document.getElementById('correctAnswer')
+  }
+
+	let currentNumber = null;
+	let currentPart = null;
+	let enterIsNext = false;
+	let remainngNumbers = [];
+
 	function insertText(text) {
-		document.getElementById('answer').value += text;
+		els.answer.value += text;
+		els.answer.focus();
 	}
+
+	function toKansujiName(num) {
+		return ["初句", "二句", "三句", "四句", "結句"][num - 1];
+	}
+  
+  function normalize(input) {
+    if(!input) return "";
+    let res = input.trim();
+    res = res.replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+    res = res.replace(/　/g, ' ');
+    res = res.replace(/\s+/g, ' ');
+    res = res.toLowerCase();
+    return res;
+  }
+
+	function resetQuestions() {
+		remainngNumbers = [];
+
+		const from = parseInt(els.rangeFrom.value, 10);
+		const to = parseInt(els.rangeTo.value, 10);
+		if (isNaN(from) || isNaN(to) || from < 1 || to > 100 || from > to) {
+			alert("範囲が正しくありません。");
+			return;
+		}
+
+		for (let i = from; i <= to; i++) {
+			remainngNumbers.push(i);
+		}
+	}
+
+  function getMode() {
+    const mode = els.mode.querySelector('input[name="mode"]:checked');
+    return mode ? mode.value : null;
+  }
+
+	function randomInt(min, max) {
+		return Math.floor(Math.random() * (max - min + 1)) + min;
+	}
+	function getRandomInRange() {
+		if (remainngNumbers.length === 0) {
+			resetQuestions();
+		}
+		if (remainngNumbers.length === 0) {
+			return null;
+		}
+		const idx = randomInt(0, remainngNumbers.length - 1);
+		const n = remainngNumbers[idx];
+
+		// 選ばれた番号を末尾とswapしてからpopする（実際にswapする必要はない）
+		remainngNumbers[idx] = remainngNumbers[remainngNumbers.length - 1];
+		remainngNumbers.pop();
+
+		return n;
+	}
+
+	function ask() {
+		const n = getRandomInRange();
+		if (n === null) return;
+		currentNumber = n;
+		currentPart = null;
+
+		const mode = getMode();
+		els.info.textContent = '';
+		els.statement.textContent = '';
+		els.result.textContent = '';
+		els.correctAnswer.textContent = '';
+
+		if (mode === null) {
+			alert("モードを選択してください。");
+			return;
+		} else if (mode === 'all') {
+			els.statement.textContent = `第${n}首（${AUTHORS[n][0]}）`;
+		} else if (mode === "first") {
+			els.info.textContent = `第${n}首（${AUTHORS[n][0]}）の二句以降`;
+			els.statement.textContent = `${TANKA_KANJI[n][0]}...`;
+		} else if (mode === "part") {
+			// チェックが入っている場所からランダムに選ぶ
+			const checkedParts = Array.from(
+				els.partSelect.querySelectorAll('input[type="checkbox"]:checked')
+			).map(cb => parseInt(cb.value, 10));
+
+			if (checkedParts.length === 0) {
+				alert("少なくとも1つの句を選択してください。");
+				return;
+			}
+			const k = checkedParts[randomInt(0, checkedParts.length - 1)];
+			currentPart = k;
+			els.info.textContent = `第${n}首（${AUTHORS[n][0]}）の${toKansujiName(k)}`;
+			for (let i = 0; i < 5; i++) {
+				if (i === k-1) {
+					// 初句の出題時、一文字目はヒントとして表示する
+					if (i === 0) els.statement.textContent += TANKA_KANA[n][0].charAt(0);
+					els.statement.textContent += "（　？　）";
+				} else {
+					els.statement.textContent += TANKA_KANJI[n][i];
+				}
+				els.statement.textContent += (i < 4) ? " " : "";
+			}
+		} else if (mode === "author") {
+			els.info.textContent = `第${n}首の作者名`;
+			els.statement.textContent = `${TANKA_KANJI[n].join(" ")}`;
+		}
+
+		els.answer.value = "";
+		els.answer.focus();
+		enterIsNext = false;
+	}
+
+	function judge() {
+		if (currentNumber === null) {
+			return;
+		}
+		const mode = getMode();
+
+		if (mode === "all") {
+			const user = normalize(els.answer.value);
+			const correct = normalize(TANKA_KANA[currentNumber].join(" "));
+			if (user === correct) {
+				els.result.textContent = "正解！";
+				els.correctAnswer.textContent = "";
+			} else {
+				els.result.textContent = "不正解...";
+				els.correctAnswer.textContent = `正解：${TANKA_KANA[currentNumber].join(" ")}`;
+			}
+		} else if (mode === "first") {
+			const user = normalize(els.answer.value);
+			const correct = normalize(TANKA_KANA[currentNumber].slice(1).join(" "));
+			if (user === correct) {
+				els.result.textContent = "正解！";
+				els.correctAnswer.textContent = "";
+			} else {
+				els.result.textContent = "不正解...";
+				els.correctAnswer.textContent = `正解：${TANKA_KANA[currentNumber].slice(1).join(" ")}`;
+			}
+		} else if (mode === "part") {
+			if (currentPart === null) return;
+			const user = normalize(els.answer.value);
+			const correct = normalize(TANKA_KANA[currentNumber][currentPart - 1]);
+			if (user === correct) {
+				els.result.textContent = "正解！";
+				els.correctAnswer.textContent = "";
+			} else {
+				els.result.textContent = "不正解...";
+				els.correctAnswer.textContent = `正解：${TANKA_KANA[currentNumber][currentPart - 1]}`;
+			}
+		} else if (mode === "author") {
+			const user = normalize(els.answer.value);
+			// 表記リストの中に含まれていれば正解とする
+			const ok = AUTHORS[currentNumber].some(author => normalize(author) === user);
+			if (ok) {
+				els.result.textContent = "正解！";
+				els.correctAnswer.textContent = "";
+			} else {
+				els.result.textContent = "不正解...";
+				els.correctAnswer.textContent = `正解：${AUTHORS[currentNumber][0]}`;
+				for (let i = 1; i < AUTHORS[currentNumber].length; i++) {
+					if (i === 1) els.correctAnswer.textContent += "（別表記：";
+					if (i > 1) els.correctAnswer.textContent += "、";
+					els.correctAnswer.textContent += `${AUTHORS[currentNumber][i]}`;
+					if (i === AUTHORS[currentNumber].length - 1) els.correctAnswer.textContent += "）";
+				}
+			}
+		}
+		enterIsNext = true;
+		els.answer.focus();
+	}
+
+	els.rangeFrom.addEventListener('change', resetQuestions);
+	els.rangeTo.addEventListener('change', resetQuestions);
+	els.next.addEventListener('click', ask);
+	els.submit.addEventListener('click', judge);
+	els.mode.addEventListener('change', () => {
+		const mode = getMode();
+		currentNumber = null;
+		currentPart = null;
+		enterIsNext = false;
+		els.info.textContent = "";
+		els.statement.textContent = "「出題」ボタンを押してください";
+		els.result.textContent = "";
+		els.correctAnswer.textContent = "";
+		resetQuestions();
+		if (mode === "part") {
+			els.partSelect.style.display = "flex";
+		} else {
+			els.partSelect.style.display = "none";
+		}
+	});
+	els.answer.addEventListener('keydown', (event) => {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			if (enterIsNext) {
+				ask();
+			} else {
+				judge();
+			}
+		}
+	});
+	els.wi.addEventListener('click', () => insertText('ゐ'));
+	els.we.addEventListener('click', () => insertText('ゑ'));
 </script>
