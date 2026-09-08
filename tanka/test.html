@@ -134,7 +134,7 @@
 	let currentNumber = null;
 	let currentPart = null;
 	let enterIsNext = false;
-	let remainngNumbers = [];
+	let remaningNumbers = [];
 
 	function insertText(text) {
 		els.answer.value += text;
@@ -156,7 +156,7 @@
   }
 
 	function resetQuestions() {
-		remainngNumbers = [];
+		remaningNumbers = [];
 
 		const from = parseInt(els.rangeFrom.value, 10);
 		const to = parseInt(els.rangeTo.value, 10);
@@ -166,7 +166,7 @@
 		}
 
 		for (let i = from; i <= to; i++) {
-			remainngNumbers.push(i);
+			remaningNumbers.push(i);
 		}
 	}
 
@@ -179,38 +179,54 @@
 		return Math.floor(Math.random() * (max - min + 1)) + min;
 	}
 	function getRandomInRange() {
-		if (remainngNumbers.length === 0) {
+		if (remaningNumbers.length === 0) {
 			resetQuestions();
 		}
-		if (remainngNumbers.length === 0) {
+		if (remaningNumbers.length === 0) {
 			return null;
 		}
-		const idx = randomInt(0, remainngNumbers.length - 1);
-		const n = remainngNumbers[idx];
+		const idx = randomInt(0, remaningNumbers.length - 1);
+		const n = remaningNumbers[idx];
 
 		// 選ばれた番号を末尾とswapしてからpopする（実際にswapする必要はない）
-		remainngNumbers[idx] = remainngNumbers[remainngNumbers.length - 1];
-		remainngNumbers.pop();
+		remaningNumbers[idx] = remaningNumbers[remaningNumbers.length - 1];
+		remaningNumbers.pop();
 
 		return n;
 	}
 
+	function changeSetting() {
+		currentNumber = null;
+		currentPart = null;
+		enterIsNext = false;
+		els.info.textContent = "";
+		if (getMode()) {
+			els.statement.textContent = "「出題」ボタンを押してください";
+		} else {
+			els.statement.textContent = "モードを選択してください";
+		}
+		els.result.textContent = "";
+		els.correctAnswer.textContent = "";
+		resetQuestions();
+	}
+
 	function ask() {
+		const mode = getMode();
+		if (mode === null) {
+			alert("モードを選択してください。");
+			return;
+		}
+
 		const n = getRandomInRange();
 		if (n === null) return;
 		currentNumber = n;
 		currentPart = null;
-
-		const mode = getMode();
 		els.info.textContent = '';
 		els.statement.textContent = '';
 		els.result.textContent = '';
 		els.correctAnswer.textContent = '';
 
-		if (mode === null) {
-			alert("モードを選択してください。");
-			return;
-		} else if (mode === 'all') {
+		if (mode === 'all') {
 			els.statement.textContent = `第${n}首（${AUTHORS[n][0]}）`;
 		} else if (mode === "first") {
 			els.info.textContent = `第${n}首（${AUTHORS[n][0]}）の二句以降`;
@@ -307,21 +323,14 @@
 		els.answer.focus();
 	}
 
-	els.rangeFrom.addEventListener('change', resetQuestions);
-	els.rangeTo.addEventListener('change', resetQuestions);
+	els.rangeFrom.addEventListener('change', changeSetting);
+	els.rangeTo.addEventListener('change', changeSetting);
 	els.next.addEventListener('click', ask);
 	els.submit.addEventListener('click', judge);
 	document.querySelectorAll('input[name="mode"]').forEach(radio => {
 		radio.addEventListener('change', () => {
+			changeSetting();
 			const mode = getMode();
-			currentNumber = null;
-			currentPart = null;
-			enterIsNext = false;
-			els.info.textContent = "";
-			els.statement.textContent = "「出題」ボタンを押してください";
-			els.result.textContent = "";
-			els.correctAnswer.textContent = "";
-			resetQuestions();
 			if (mode === "part") {
 				els.partSelect.style.display = "flex";
 			} else {
