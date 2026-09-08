@@ -311,31 +311,23 @@
 	els.rangeTo.addEventListener('change', resetQuestions);
 	els.next.addEventListener('click', ask);
 	els.submit.addEventListener('click', judge);
-	els.mode.addEventListener('change', () => {
-		const mode = getMode();
-		currentNumber = null;
-		currentPart = null;
-		enterIsNext = false;
-		els.info.textContent = "";
-		els.statement.textContent = "「出題」ボタンを押してください";
-		els.result.textContent = "";
-		els.correctAnswer.textContent = "";
-		resetQuestions();
-		if (mode === "part") {
-			els.partSelect.style.display = "flex";
-		} else {
-			els.partSelect.style.display = "none";
-		}
-	});
-	els.answer.addEventListener('keydown', (event) => {
-		if (event.key === 'Enter') {
-			event.preventDefault();
-			if (enterIsNext) {
-				ask();
+	document.querySelectorAll('input[name="mode"]').forEach(radio => {
+		radio.addEventListener('change', () => {
+			const mode = getMode();
+			currentNumber = null;
+			currentPart = null;
+			enterIsNext = false;
+			els.info.textContent = "";
+			els.statement.textContent = "「出題」ボタンを押してください";
+			els.result.textContent = "";
+			els.correctAnswer.textContent = "";
+			resetQuestions();
+			if (mode === "part") {
+				els.partSelect.style.display = "flex";
 			} else {
-				judge();
+				els.partSelect.style.display = "none";
 			}
-		}
+		});
 	});
 	els.wi.addEventListener('click', () => insertText('ゐ'));
 	els.we.addEventListener('click', () => insertText('ゑ'));
