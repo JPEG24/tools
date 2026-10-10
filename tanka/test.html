@@ -100,6 +100,8 @@
 		<p id="result"></p>
 		<p id="correctAnswer"></p>
 
+		<p>TIPS：ローマ字入力の場合、「wyi」で「ゐ」、「wye」で「ゑ」を入力できます。</p>
+
     <h2>入力のルール</h2>
     <ul>
       <li><strong>全文</strong>：全文を歴史的仮名遣いで入力</li>
@@ -323,6 +325,14 @@
 		els.answer.focus();
 	}
 
+	els.answer.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (enterIsNext) {
+    ask();
+  } else {
+    judge();
+  }
+});
 	els.rangeFrom.addEventListener('change', changeSetting);
 	els.rangeTo.addEventListener('change', changeSetting);
 	els.next.addEventListener('click', ask);
